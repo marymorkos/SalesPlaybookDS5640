@@ -11,8 +11,8 @@ Containerized Deployment: Ensures consistent environment setup using Docker, Doc
 
 
 
-
-1. Customer Segmentation
+#Summary of Tasks
+**1. Customer Segmentation**
 Goal: Group prospects into clusters based on characteristics (like company size, industry, or past behavior) to personalize marketing and sales strategies.
 
 Techniques:
@@ -29,7 +29,7 @@ Outcome: Tailored outreach plans based on each segment's behavior or needs.
 
 
 
-2. Pipeline Progression Guide
+**2. Pipeline Progression Guide**
 Goal: Identify which actions at each stage of the sales pipeline lead to successful deal closures.
 
 Approach:
@@ -46,7 +46,7 @@ Outcome: A playbook of recommended actions per stage to help sales reps push dea
 
 
 
-3. Deal Outcome Prediction
+**3. Deal Outcome Prediction**
 Goal: Predict whether a deal will close successfully.
 
 Models Used:
@@ -63,7 +63,7 @@ Outcome: A probability score for each deal that helps prioritize efforts.
 
 
 
-4. Implementation Handoff Optimization
+**4. Implementation Handoff Optimization**
 Goal: Make the transition from Sales to Customer Success smoother after a deal closes.
 
 What’s involved:
@@ -78,7 +78,7 @@ Outcome: Faster onboarding, fewer dropped balls, better customer experience.
 
 
 
-5. Resource Allocation Recommendations
+**5. Resource Allocation Recommendations**
 Goal: Allocate resources (e.g., support staff, onboarding tools) based on customer needs.
 
 Measured By:
@@ -97,7 +97,7 @@ Outcome: Guidance on how much support each type of customer needs (e.g., enterpr
 
 
 
-6. Interactive Dashboard
+**6. Interactive Dashboard**
 Goal: Create a visual tool for decision-makers to interact with all the ML insights.
 
 Tech Used:
@@ -114,7 +114,7 @@ Actionable insights shown clearly for business users.
 
 
 
-7. Automated Data Pipeline
+**7. Automated Data Pipeline**
 Goal: Keep all your models and dashboards updated automatically.
 
 Built With:
@@ -127,7 +127,7 @@ Outcome: No need for manual updates — recommendations stay fresh.
 
 
 
-8. Containerized Deployment
+**8. Containerized Deployment**
 Goal: Ensure your entire ML system runs smoothly across environments (local, dev, prod).
 
 Tech Stack:
