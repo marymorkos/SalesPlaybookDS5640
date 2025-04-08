@@ -11,7 +11,8 @@ Containerized Deployment: Ensures consistent environment setup using Docker, Doc
 
 
 
-#Summary of Tasks
+# Summary of Tasks
+
 **1. Customer Segmentation**
 Goal: Group prospects into clusters based on characteristics (like company size, industry, or past behavior) to personalize marketing and sales strategies.
 
