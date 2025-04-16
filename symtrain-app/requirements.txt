@@ -1,0 +1,12 @@
+numpy
+pandas
+scikit-learn
+streamlit
+joblib
+matplotlib
+seaborn
+plotly
+altair
+requests
+pacmap
+Pillow
