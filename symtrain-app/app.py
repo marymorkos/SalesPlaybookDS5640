@@ -26,6 +26,24 @@ page = st.sidebar.radio("Go to", [
 ])
 
 # === LOAD MODELS AND ASSETS ===
+@st.cache_resource
+def load_preprocessing_module():
+    # Get the preprocessing.py module from GitHub
+    preprocessing_url = "https://raw.githubusercontent.com/marymorkos/SalesPlaybookDS5640/main/customer_segmentation/utils/preprocessing.py"
+    preprocessing_content = requests.get(preprocessing_url).text
+    
+    # Create a module from the content
+    spec = importlib.util.spec_from_loader(
+        "preprocessing", 
+        loader=None, 
+        origin=preprocessing_url
+    )
+    preprocessing = importlib.util.module_from_spec(spec)
+    
+    # Execute the module code
+    exec(preprocessing_content, preprocessing.__dict__)
+    
+    return preprocessing
 
 @st.cache_resource
 def load_deal_model_assets():
@@ -36,8 +54,8 @@ def load_deal_model_assets():
 
 @st.cache_resource
 def load_segmentation_assets():
-    scaler_url = "https://raw.githubusercontent.com/marymorkos/SalesPlaybookDS5640/main/customer_segmentation/minmax_scaler_simplified_7features.pkl"
-    model_url = "https://raw.githubusercontent.com/marymorkos/SalesPlaybookDS5640/main/customer_segmentation/kmeans_model_simplified_7features.pkl"
+    model_url = "https://raw.githubusercontent.com/marymorkos/SalesPlaybookDS5640/main/customer_segmentation/models/kmeans_model.joblib"
+    scaler_url = "https://raw.githubusercontent.com/marymorkos/SalesPlaybookDS5640/main/customer_segmentation/models/minmax_scaler.joblib"
     scaler = joblib.load(BytesIO(requests.get(scaler_url).content))
     model = joblib.load(BytesIO(requests.get(model_url).content))
     return scaler, model
@@ -169,11 +187,10 @@ elif page == "Customer Segmentation":
 
         st.success(f"🎯 Predicted Customer Segment: {segment}")
         meanings = {
-            0: "🟢 Small, high-engagement companies",
-            1: "🔵 Large enterprises with moderate traffic",
-            2: "🟡 High-revenue, low-engagement firms",
-            3: "🟠 Medium-sized firms, high traffic",
-            4: "🔴 Low-revenue, low-activity customers"
+            0: "🟢 Segment 0: Small businesses with high digital engagement",
+            1: "🔵 Segment 1: Mid-market companies with moderate engagement",
+            2: "🟡 Segment 2: Enterprise clients with high revenue and specialized needs",
+            3: "🟠 Segment 3: Growth-stage companies with high potential"
         }
         st.markdown(f"**Interpretation:** {meanings.get(segment, 'Unknown')}")
 
@@ -184,11 +201,28 @@ elif page == "Customer Segmentation":
                 pca_centroids = pca.fit_transform(centroids)
                 input_pca = pca.transform(scaler.transform(input_df))
 
-                fig, ax = plt.subplots()
-                ax.scatter(pca_centroids[:, 0], pca_centroids[:, 1], c='gray', label='Centroids')
-                ax.scatter(input_pca[:, 0], input_pca[:, 1], c='red', label='Input', marker='X', s=100)
-                ax.legend()
-                ax.set_title("Customer Segment via PCA")
+                fig, ax = plt.subplots(figsize=(8, 6))
+
+                # Plot centroids - updated for 4 clusters with distinct colors
+                ax.scatter(pca_centroids[:, 0], pca_centroids[:, 1], 
+                        s=200, marker='o', c=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'], 
+                        edgecolors='k', alpha=0.7, label='Cluster Centers')
+
+                # Plot input data point
+                ax.scatter(input_pca[:, 0], input_pca[:, 1], 
+                        s=300, marker='*', c='purple', 
+                        edgecolors='k', label='Your Customer')
+
+                # Add cluster labels
+                for i, (x, y) in enumerate(pca_centroids):
+                    ax.annotate(f'Cluster {i}', (x, y), 
+                            textcoords="offset points", 
+                            xytext=(0,10), 
+                            ha='center')
+
+                ax.set_title('Customer Position Relative to Cluster Centers', fontsize=14)
+                ax.legend(loc='best')
+                ax.grid(True, linestyle='--', alpha=0.7)
                 st.pyplot(fig)
             except Exception as e:
                 st.warning(f"Plotting failed: {e}")
@@ -266,7 +300,7 @@ elif page == "Customer Segmentation":
                 x="PCA1",
                 y="PCA2",
                 color="Segment",
-                color_discrete_sequence=custom_colors,
+                color_discrete_sequence=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'],
                 title="PCA Projection of Customer Segments",
                 width=700,
                 height=450
