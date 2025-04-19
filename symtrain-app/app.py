@@ -6,8 +6,13 @@ import seaborn as sns
 from io import BytesIO
 import requests
 from PIL import Image
+import importlib.util
+import importlib
+import sys
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
+import pacmap
+import plotly.express as px
 
 # === App Config ===
 st.set_page_config(page_title="Sales Analytics Dashboard", layout="wide")
@@ -27,14 +32,14 @@ page = st.sidebar.radio("Go to", [
 
 # === LOAD MODELS AND ASSETS ===
 @st.cache_resource
-def load_preprocessing_module():
+def load_customer_segmentation_preprocessing():
     # Get the preprocessing.py module from GitHub
     preprocessing_url = "https://raw.githubusercontent.com/marymorkos/SalesPlaybookDS5640/main/customer_segmentation/utils/preprocessing.py"
     preprocessing_content = requests.get(preprocessing_url).text
     
     # Create a module from the content
     spec = importlib.util.spec_from_loader(
-        "preprocessing", 
+        "customer_segmentation_preprocessing", # Changed the name here
         loader=None, 
         origin=preprocessing_url
     )
@@ -62,7 +67,7 @@ def load_segmentation_assets():
 
 # === Page: Deal Outcome Predictor ===
 if page == "Deal Outcome Predictor":
-    from preprocessing import preprocess_data
+    from preprocessing import preprocess_data as deal_preprocess_data
 
     st.title("🎯 Deal Outcome Prediction Dashboard")
     st.markdown("Upload your deal data to predict win probability.")
@@ -76,7 +81,7 @@ if page == "Deal Outcome Predictor":
 
         try:
             # === Prediction using processed data ===
-            processed_df = preprocess_data(input_df, scaler, encoding_info)
+            processed_df = deal_preprocess_data(input_df, scaler, encoding_info)
             processed_df = processed_df[model.feature_names_in_]
 
             predictions = model.predict(processed_df)
@@ -229,155 +234,289 @@ elif page == "Customer Segmentation":
 
     # Batch upload
     st.write("### 📥 Batch Prediction from CSV")
-    uploaded = st.file_uploader("Upload CSV with 7 numeric columns", type=["csv"], key="segment_csv")
+    uploaded = st.file_uploader("Upload CSV with customer data", type=["csv"], key="segment_csv")
     if uploaded:
-        df_batch = pd.read_csv(uploaded)
-    
         try:
-    
-    # 🧠 Simplified Customer Segmentation Model (7 Numeric Features from Clean GitHub Data)
-
-            import pandas as pd
-            import datetime
-            from sklearn.preprocessing import MinMaxScaler
-            from sklearn.cluster import KMeans
-            import joblib
-
-
-
-            # 🔹 STEP 2: Ensure 'Year Founded' is not null and compute 'Company_Age'
-            df_batch = df_batch[df_batch['Year Founded'].notnull()].copy()
-            current_year = datetime.datetime.now().year
-            df_batch['Company_Age'] = current_year - df_batch['Year Founded']
-
-            # 🔹 STEP 3: Define 7 key numeric features for segmentation
-            selected_features = [
-                'Annual Revenue',
-                'Number of Form Submissions',
-                'Number of times contacted',
-                'Number of Pageviews',
-                'Company_Age',
-                'Number of Employees',
-                'Number of Sessions'
-            ]
-
-            # 🔹 STEP 4: Prepare feature matrix (remove rows with any missing values)
-            df_batch = df_batch[selected_features].dropna()
-
-    
-
-            X_scaled = scaler.transform(df_batch)
-            preds = model.predict(X_scaled)
-            df_batch["Predicted Segment"] = preds
-            st.dataframe(df_batch)
-
-            # === PCA Plot of All Clusters ===
-            st.subheader("🧬 Cluster Visualization")
-
-
-
-            import pacmap
-            import plotly.express as px
-            from sklearn.decomposition import PCA
-
-            # Consistent color palette
-            custom_colors = [
-                "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
-                "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
-            ]
-
-            # Convert predictions to labeled string format
-            segment_labels = ["Segment " + str(x) for x in preds]
-
-            # === PCA Plot ===
-            pca = PCA(n_components=2)
-            pca_embed = pca.fit_transform(X_scaled)
-            pca_df = pd.DataFrame(pca_embed, columns=["PCA1", "PCA2"])
-            pca_df["Segment"] = segment_labels
-
-            fig_pca = px.scatter(
-                pca_df,
-                x="PCA1",
-                y="PCA2",
-                color="Segment",
-                color_discrete_sequence=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'],
-                title="PCA Projection of Customer Segments",
-                width=700,
-                height=450
-            )
-            fig_pca.update_traces(marker=dict(size=10, opacity=0.7))
-            fig_pca.update_layout(legend_title_text="Segment")
-            st.plotly_chart(fig_pca, use_container_width=True)
-
-            # === PaCMAP Plot ===
-            reducer = pacmap.PaCMAP(n_components=2, random_state=42)
-            pacmap_embed = reducer.fit_transform(X_scaled)
-            pacmap_df = pd.DataFrame(pacmap_embed, columns=["PaCMAP_1", "PaCMAP_2"])
-            pacmap_df["Segment"] = segment_labels
-
-            fig_pacmap = px.scatter(
-                pacmap_df,
-                x="PaCMAP_1",
-                y="PaCMAP_2",
-                color="Segment",
-                color_discrete_sequence=custom_colors,
-                title="PaCMAP Projection of Customer Segments",
-                width=700,
-                height=450
-            )
-            fig_pacmap.update_traces(marker=dict(size=10, opacity=0.7))
-            fig_pacmap.update_layout(legend_title_text="Segment")
-            st.plotly_chart(fig_pacmap, use_container_width=True)
-
-
-
-
-            # === Cluster Summary and Filtering ===
-            st.subheader("📊 Cluster Summary and Filtering")
-            selected_segment = st.selectbox("Select Segment to Explore", sorted(df_batch["Predicted Segment"].unique()))
-
-            segment_df = df_batch[df_batch["Predicted Segment"] == selected_segment]
-            st.markdown(f"**Segment Size:** {len(segment_df)} customers")
-
-            # Summary statistics
-            st.markdown("**Average Feature Values**")
-            st.dataframe(segment_df.drop(columns=["Predicted Segment"]).mean().to_frame("Average Value").round(2))
-
-            st.subheader("📊 Cluster Comparison for Each Feature")
-
-            # Calculate mean of each feature grouped by cluster
-            cluster_means = df_batch.groupby("Predicted Segment").mean(numeric_only=True)
+            # Load data
+            df_batch = pd.read_csv(uploaded)
+            st.write("Preview of uploaded data:")
+            st.dataframe(df_batch.head())
             
-            import altair as alt
+            # Load preprocessing module
+            preprocessing = load_customer_segmentation_preprocessing()
+            
+            # Check if required columns exist in the uploaded data
+            required_columns = [
+                'Annual Revenue', 
+                'Number of Form Submissions', 
+                'Web Technologies', 
+                'Number of times contacted',  
+                'Time Zone', 
+                'Primary Industry', 
+                'Number of Pageviews', 
+                'Year Founded',  
+                'Consolidated Industry', 
+                'Number of Employees', 
+                'Number of Sessions', 
+                'Country/Region', 
+                'Industry'
+            ]
+            
+            missing_cols = [col for col in required_columns if col not in df_batch.columns]
+            if missing_cols:
+                st.error(f"Your data is missing these required columns: {', '.join(missing_cols)}")
+                st.stop()
+            
+            # Display preprocessing status
+            status_text = st.empty()
+            status_text.info("Processing data through full preprocessing pipeline...")
+            
+            # Apply full preprocessing pipeline
+            try:
+                # Run the full preprocessing
+                df_scaled, _, X_cluster = preprocessing.full_preprocessing_pipeline(df_batch)
+                
+                # Make predictions using the processed features
+                preds = model.predict(X_cluster)
+                
+                # After preprocessing and getting predictions
+                # Get the processed data with predictions
+                df_results = df_batch.copy()  # Start with the full original dataset
 
-            feature_df = cluster_means.reset_index().melt(id_vars="Predicted Segment", var_name="Feature", value_name="Average")
+                # Create a new column for predictions, initialized with NaN
+                df_results["Predicted_Segment"] = 0
 
-            for feature in feature_df["Feature"].unique():
-                chart = alt.Chart(feature_df[feature_df["Feature"] == feature]).mark_bar().encode(
-                    x=alt.X("Predicted Segment:N", title="Segment"),
-                    y=alt.Y("Average:Q", title=f"Average {feature}"),
-                    tooltip=["Predicted Segment", "Average"]
-                ).properties(title=f"{feature} by Segment")
-                st.altair_chart(chart, use_container_width=True)
+                # Match predictions with the correct rows
+                # Assuming that X_cluster maintains the same index as the rows that were kept
+                # from the original dataframe after preprocessing
+                if hasattr(X_cluster, 'index'):
+                    # If X_cluster is a DataFrame with an index
+                    df_results.loc[X_cluster.index, "Predicted_Segment"] = preds.astype(int)
+                else:
+                    # If X_cluster doesn't have an index (e.g., it's a numpy array)
+                    # We need to modify the preprocessing pipeline to track which rows were kept
+                    st.warning("Predictions added to processed rows only. Some rows were removed during preprocessing due to missing values.")
+                    # Only keep rows that have predictions
+                    df_results = df_results.iloc[:len(preds)].copy()
+                    df_results["Predicted_Segment"] = preds
+                
+                # Update status
+                status_text.success("✅ Segmentation complete!")
+                
+                # Show results
+                st.write("Segmentation Results:")
+                st.dataframe(df_results[['Predicted_Segment']].head(10))
+                
+                # Continue with the rest of your visualization code
+                # === PCA Plot of All Clusters ===
+                st.subheader("🧬 Cluster Visualization")
 
-            # Allow download of filtered segment
-            csv_segment = segment_df.to_csv(index=False).encode("utf-8")
-            st.download_button(f"⬇️ Download Segment {selected_segment} Data", csv_segment, f"segment_{selected_segment}.csv", "text/csv")
+                import plotly.express as px
+                from sklearn.decomposition import PCA
+                
+                # Convert predictions to labeled string format
+                segment_labels = ["Segment " + str(x) for x in preds]
+                
+                # === PCA Plot ===
+                pca = PCA(n_components=2)
+                pca_embed = pca.fit_transform(X_cluster)
+                pca_df = pd.DataFrame(pca_embed, columns=["PCA1", "PCA2"])
+                pca_df["Segment"] = segment_labels
+                
+                fig_pca = px.scatter(
+                    pca_df,
+                    x="PCA1",
+                    y="PCA2",
+                    color="Segment",
+                    color_discrete_sequence=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'],
+                    title="PCA Projection of Customer Segments",
+                    width=700,
+                    height=450
+                )
+                fig_pca.update_traces(marker=dict(size=10, opacity=0.7))
+                fig_pca.update_layout(legend_title_text="Segment")
+                st.plotly_chart(fig_pca, use_container_width=True)
 
-            # Download all
-            csv = df_batch.to_csv(index=False).encode('utf-8')
-            st.download_button("📤 Download All Predictions", csv, "segmented_customers.csv", "text/csv")
+                # Pacma visualization
+                st.subheader("🔄 Dimensionality Reduction Visualization")
 
-       # try:
-       #     X_scaled = scaler.transform(df_batch)
-       #     preds = model.predict(X_scaled)
-       #     df_batch["Predicted Segment"] = preds
-       #     st.dataframe(df_batch)
+                try:
+                    # Create PaCMAP embedding
+                    with st.spinner("Generating PaCMAP visualization..."):
+                        # PaCMAP uses PaCMAP class from the pacmap module
+                        reducer = pacmap.PaCMAP(
+                            n_components=2,  # Note: uses n_components, not n_dims
+                            n_neighbors=10,
+                            MN_ratio=0.5,
+                            FP_ratio=2.0,
+                            random_state=42
+                        )
+                        
+                        # Then use fit_transform to get the embedding
+                        pacmap_embed = reducer.fit_transform(X_cluster)
+                        pacmap_df = pd.DataFrame(pacmap_embed, columns=["PaCMAP_1", "PaCMAP_2"])
+                        pacmap_df["Segment"] = segment_labels
+                    
+                    # Create PaCMAP plot
+                    fig_pacmap = px.scatter(
+                        pacmap_df,
+                        x="PaCMAP_1",
+                        y="PaCMAP_2",
+                        color="Segment",
+                        color_discrete_sequence=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'],
+                        title="PaCMAP Projection of Customer Segments",
+                        width=700,
+                        height=450
+                    )
+                    fig_pacmap.update_traces(marker=dict(size=10, opacity=0.7))
+                    fig_pacmap.update_layout(legend_title_text="Segment")
+                    st.plotly_chart(fig_pacmap, use_container_width=True)
+                except Exception as e:
+                    st.error(f"Error generating PaCMAP visualization: {str(e)}")
+                    st.info("Make sure you have installed pacmap: pip install pacmap")
+                
+                # === Cluster Summary and Filtering ===
+                st.subheader("📊 Cluster Summary and Filtering")
+                selected_segment = st.selectbox("Select Segment to Explore", sorted([int(x) for x in df_results["Predicted_Segment"].unique()]))
+                
+                segment_df = df_results[df_results["Predicted_Segment"] == selected_segment]
+                st.markdown(f"**Segment Size:** {len(segment_df)} customers")
+                
+                # Summary statistics for numerical features
+                numerical_features = [
+                    'Annual Revenue', 
+                    'Number of Form Submissions', 
+                    'Number of times contacted',
+                    'Number of Pageviews', 
+                    'Company_Age',
+                    'Number of Employees', 
+                    'Number of Sessions'
+                ]
+                
+                # Only include columns that exist in the results
+                available_num_features = [col for col in numerical_features if col in segment_df.columns]
+                
+                # Summary statistics
+                # Replace it with this:
+                st.markdown("**Average Feature Values**")
+                avg_values_df = segment_df[available_num_features].mean().to_frame("Average Value").round(2)
+                st.dataframe(avg_values_df, width=800)
 
-       #     csv = df_batch.to_csv(index=False).encode('utf-8')
-       #     st.download_button("📤 Download Predictions", csv, "segmented_customers.csv", "text/csv")
+                # Add after the section where you display average feature values
+                st.markdown("### Segment Characteristics")
+
+                try:
+                    # Basic data validation
+                    if len(available_num_features) < 2:
+                        st.warning("Insufficient numeric features for visualization. Please include more numeric columns.")
+                    else:
+                        # Create two simple visualization tabs
+                        vis_tabs = st.tabs(["Feature Comparison", "Feature Distribution"])
+                        
+                        # TAB 1: Feature Comparison - Bar chart comparing segment vs overall
+                        with vis_tabs[0]:
+                            # Calculate metrics once and reuse
+                            overall_avg = df_results[available_num_features].mean().reset_index()
+                            overall_avg.columns = ['Feature', 'Overall Average']
+                            
+                            segment_avg = segment_df[available_num_features].mean().reset_index()
+                            segment_avg.columns = ['Feature', f'Segment {selected_segment} Average']
+                            
+                            # Get percent differences for the visualization
+                            comparison_df = pd.merge(overall_avg, segment_avg, on='Feature')
+                            comparison_df['Percent Difference'] = ((comparison_df[f'Segment {selected_segment} Average'] - 
+                                                                comparison_df['Overall Average']) / 
+                                                                comparison_df['Overall Average'] * 100).round(1)
+                            
+                            # Sort by absolute percent difference
+                            comparison_df = comparison_df.sort_values(by='Percent Difference', key=abs, ascending=False)
+                            
+                            # Create horizontal bar chart for percent differences
+                            fig = px.bar(
+                                comparison_df,
+                                y='Feature',
+                                x='Percent Difference',
+                                orientation='h',
+                                title=f'Segment {selected_segment} vs Overall Average (%)',
+                                color='Percent Difference',
+                                color_continuous_scale=px.colors.diverging.RdBu_r
+                            )
+                            fig.update_layout(xaxis_title="% Difference from Overall", yaxis_title="")
+                            st.plotly_chart(fig, use_container_width=True)
+                            
+                            # Show top differentiating features as text explanation
+                            top_diff = comparison_df.head(3)
+                            st.markdown("#### Key Segment Characteristics:")
+                            
+                            for _, row in top_diff.iterrows():
+                                feature = row['Feature']
+                                pct_diff = row['Percent Difference']
+                                direction = "higher" if pct_diff > 0 else "lower"
+                                st.markdown(f"- **{feature}**: {abs(pct_diff):.1f}% {direction} than average")
+                        
+                        # TAB 2: Feature Distribution - Show distributions of key features
+                        with vis_tabs[1]:
+                            # Pick top 3 most differentiating features automatically
+                            top_features = comparison_df.head(3)['Feature'].tolist()
+                            
+                            if top_features:
+                                selected_feature = st.selectbox(
+                                    "Select a feature to view its distribution:",
+                                    options=top_features + [f for f in available_num_features if f not in top_features],
+                                    index=0
+                                )
+                                
+                                # Create two figures side-by-side for cleaner layout
+                                col1, col2 = st.columns(2)
+                                
+                                with col1:
+                                    # Box plot comparing the distribution across all segments
+                                    fig_box = px.box(
+                                        df_results,
+                                        x="Predicted_Segment",
+                                        y=selected_feature,
+                                        title=f"{selected_feature} by Segment",
+                                        color="Predicted_Segment"
+                                    )
+                                    st.plotly_chart(fig_box, use_container_width=True)
+                                
+                                with col2:
+                                    # Histogram comparing segment vs overall
+                                    fig_hist = px.histogram(
+                                        df_results,
+                                        x=selected_feature,
+                                        color="Predicted_Segment",
+                                        histnorm='percent',
+                                        barmode='overlay',
+                                        opacity=0.7,
+                                        title=f"{selected_feature} Distribution"
+                                    )
+                                    st.plotly_chart(fig_hist, use_container_width=True)
+                            else:
+                                st.info("No features available for distribution analysis.")
+
+                except Exception as e:
+                    st.error(f"Visualization error: {str(e)}")
+                    st.info("Please ensure your data has the required numeric columns and is properly formatted.")
+
+                # Allow download of filtered segment
+                csv_segment = segment_df.to_csv(index=False).encode("utf-8")
+                st.download_button(f"⬇️ Download Segment {selected_segment} Data", csv_segment, f"segment_{selected_segment}.csv", "text/csv")
+                
+                # Download all
+                csv = df_results.to_csv(index=False).encode('utf-8')
+                st.download_button("📤 Download All Predictions", csv, "segmented_customers.csv", "text/csv")
+                
+            except AttributeError as e:
+                st.error(f"Error with preprocessing module: {str(e)}")
+                st.error("The preprocessing module doesn't contain the expected function. Please check the implementation.")
+                
+            except Exception as e:
+                st.error(f"Error during processing: {str(e)}")
+                st.error("Please make sure your data matches the required format.")
+                
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"Error: {str(e)}")
 
 
 
