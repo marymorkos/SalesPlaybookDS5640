@@ -1,0 +1,6 @@
+Annual Revenue,Number of times contacted,Amount in company currency,Amount,Forecast amount,Number of Pageviews,Number of Employees,Number of Sessions,Days to close,Number of Form Submissions,Year Founded,Deal Type,ICP Fit Level,Deal owner,Deal source attribution 2,State/Region,Primary Sub-Industry,Industry
+5000000,8,30000,30000,28000,150,200,50,30,10,2010,New Business,Tier 1,John Doe,Referral Partner,California,Software,Technology
+,10,50000,50000,,,150,30,45,,2012,Renewal,,,Event,Texas,,Finance
+7000000,,60000,60000,59000,180,,,,12,,,Tier 3,Jane Smith,,,Cloud,
+10000000,15,90000,90000,88000,300,500,100,15,20,2005,New Business,Tier 1,Jane Smith,Referral Partner,New York,SaaS,Technology
+25000000,20,100000,100000,99000,500,800,200,5,30,2000,New Business,Tier 2,Jane Smith,Event,California,SaaS,Technology
